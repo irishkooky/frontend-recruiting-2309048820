@@ -23,7 +23,7 @@ export function charge(invoice: Invoice, payments: Payment[]) {
     // COUPONを最初にくるようにして、割引をしてからCASHを計算する
     .sort((payment) => (payment.type !== 'CASH' ? -1 : 1))
     // 各支払いを計算
-    .map((payment) => {
+    .forEach((payment) => {
       // クーポンの場合
       if (payment.type === 'COUPON') {
         // パーセントがあれば
