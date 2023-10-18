@@ -14,52 +14,47 @@ export type Payment = {
   amount?: number;
 };
 
-export function charge(invoice: Invoice, payments: Payment[]) {
+export function charge(invoice: Invoice, payments: Payment[]): Receipt {
   const total = invoice.total;
-  // デポジットを加算していくためlet
   let deposit = 0;
+  let cashDeposit = 0;
 
-  payments
-    // COUPONを最初にくるようにして、割引をしてからCASHを計算する
-    .sort((payment) => (payment.type !== 'CASH' ? -1 : 1))
-    // 各支払いを計算
-    .forEach((payment) => {
-      // クーポンの場合
-      if (payment.type === 'COUPON') {
-        // パーセントがあれば
-        if (payment.percentage != null) {
-          // 割引率を計算してデポジットに加算
-          deposit += Math.floor(total * (payment.percentage / 100));
-          // パーセントでなければ
-        } else {
-          // 割引額をデポジットに加算
-          deposit += payment.amount || 0;
-        }
-        // キャッシュの場合
+  // クーポンによるデポジットを計算
+  payments.forEach((payment) => {
+    if (payment.type === 'COUPON') {
+      if (payment.percentage != null) {
+        deposit += Math.floor(total * (payment.percentage / 100));
       } else {
-        // クーポンでまかない切れていたらエラー
-        if (deposit >= total) {
-          throw new Error('OverCharge');
-        }
-        // 足りなければデポジットに加算
         deposit += payment.amount || 0;
       }
-    });
-  // トータルに足りなかったら
+    }
+  });
+
+  // クーポンだけで全額カバーされているかチェック
+  const isFullyCoveredByCoupons = deposit >= total;
+
+  // 現金によるデポジットを計算
+  payments.forEach((payment) => {
+    if (payment.type !== 'COUPON') {
+      cashDeposit += payment.amount || 0;
+    }
+  });
+
+  // クーポンだけで全額カバーされている場合、現金の支払いはエラー
+  if (isFullyCoveredByCoupons && cashDeposit > 0) {
+    throw new Error('OverCharge');
+  }
+
+  deposit += cashDeposit;
+
   if (total > deposit) {
     throw new Error('Shortage');
   }
 
-  // 全てクーポンか判定する処理
-  let isCoupon = true;
-  for (let i = 0; i < payments.length; i++) {
-    if (payments[i].type !== 'COUPON') {
-      isCoupon = false;
-      continue;
-    }
+  const isCouponOnly = payments.every((payment) => payment.type === 'COUPON');
+  if (isCouponOnly) {
+    return { total, deposit, change: 0 };
   }
-  // 全てクーポンならchargeを0にする
-  if (isCoupon) return { total, deposit, change: 0 };
-  // そうでなければ、chargeを出す
-  return { total: total, deposit: deposit, change: deposit - total };
+
+  return { total, deposit, change: deposit - total };
 }
