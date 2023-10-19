@@ -47,10 +47,12 @@ export function charge(invoice: Invoice, payments: Payment[]): Receipt {
 
   deposit += cashDeposit;
 
+  // 支払額が足りない場合はエラー
   if (total > deposit) {
     throw new Error('Shortage');
   }
 
+  // クーポンのみの場合はお釣りを出さない
   const isCouponOnly = payments.every((payment) => payment.type === 'COUPON');
   if (isCouponOnly) {
     return { total, deposit, change: 0 };
